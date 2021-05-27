@@ -41,7 +41,7 @@ def post_meta_ES_func(no,ti):
 	es = Elasticsearch(hosts='127.0.0.1', port=9200)
 	data = ti.xcom_pull(key='meta_'+no)
 	data = json.dumps(data)
-	requests.post('127.0.0.1:9200',headers={'Content-Type':'application/json'},data = data)
+	#requests.post('127.0.0.1:9200',headers={'Content-Type':'application/json'},data = data)
 	es.index(index='meta', body=data)
 
 with DAG(
@@ -61,11 +61,12 @@ with DAG(
 			python_callable=get_meta_func,
 			op_kwargs={'r': r,'no':stock}
 		)
-		#post_meta_ES = PythonOperator(
-				#task_id='post_meta_ES_'+stock,
-			#python_callable=post_meta_ES_func,
-			#op_kwargs={'no': stock}
-			#)
+		post_meta_ES = PythonOperator(
+				task_id='post_meta_ES_'+stock,
+			python_callable=post_meta_ES_func,
+			op_kwargs={'no': stock}
+			)
+		'''
 		post_meta_ES = SimpleHttpOperator(
 			task_id='post_op',
 			http_conn_id='127.0.0.1:9200',
@@ -73,4 +74,5 @@ with DAG(
 			data=json.dumps("{{task_instance.xcom_pull(key='meta_'+stock)}}"),
 			headers={"Content-Type":"application/json"},
 		)
+		'''
 		get_meta >> post_meta_ES
