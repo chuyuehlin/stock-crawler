@@ -24,8 +24,8 @@ args = {
 
 def get_chart_func(r,no,ti):
 	time_now = time.strftime("%H:%M", local)
-	if time_now = '09:00' or (time_now > '13:26' and time_now != '13:31'):
-		continue
+	if time_now == '09:00' or (time_now > '13:26' and time_now != '13:31'):
+		pass
 	#from 9:01 to 13:26 and 13:31
 	local = time.localtime()
 	today = date.today()
