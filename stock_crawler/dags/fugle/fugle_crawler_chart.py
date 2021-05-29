@@ -47,7 +47,7 @@ with DAG(
     'fugle_chart',
 	default_args=args,
 	start_date=datetime(2021, 5, 25, tzinfo=local_tz),
-	schedule_interval="*/1 9-14 * * 1-5",#MON to FRI midnight in morning
+	schedule_interval="*/1 9-14 * * 1-5",#MON to FRI every minute from 9:00 to 14:00
     description='Fugle Meta API DAG',
     tags=['chart', 'fugle'],
 	on_success_callback=cleanup_xcom
