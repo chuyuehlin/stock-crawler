@@ -5,9 +5,10 @@ import requests
 from elasticsearch import Elasticsearch
 import json
 import os
+import csv
 
 from airflow import DAG
-from airflow.operators.python_operator import PythonOperator, PythonVirtualenvOperator
+from airflow.operators.python_operator import PythonOperator
 from airflow.utils.db import provide_session
 from airflow.models import XCom
 def cleanup_xcom(context, session=None):
@@ -51,17 +52,20 @@ with DAG(
     tags=['chart', 'fugle'],
 	on_success_callback=cleanup_xcom
 ) as dag_chart:
-	stocks = ['2330']
-	for stock in stocks:
-		r = requests.get('https://api.fugle.tw/realtime/v0.2/intraday/chart?symbolId='+stock+'&apiToken=706707e3df7e8e54a6932b59c85b77ca')
-		get_chart = PythonOperator(
-			task_id='get_chart_'+stock,
-			python_callable=get_chart_func,
-			op_kwargs={'r':r,'no':stock}
-		)
-		post_chart_ES = PythonOperator(
-			task_id='post_chart_ES_'+stock,
-			python_callable=post_chart_ES_func,
-			op_kwargs={'no': stock}
-		)
-		get_chart >> post_chart_ES
+	with open('id.csv', newline='') as csvfile:
+		rows = csv.reader(csvfile)
+		stocks = list(rows)[0]
+	
+		for stock in stocks:
+			r = requests.get('https://api.fugle.tw/realtime/v0.2/intraday/chart?symbolId='+stock+'&apiToken=706707e3df7e8e54a6932b59c85b77ca')
+			get_chart = PythonOperator(
+				task_id='get_chart_'+stock,
+				python_callable=get_chart_func,
+				op_kwargs={'r':r,'no':stock}
+			)
+			post_chart_ES = PythonOperator(
+				task_id='post_chart_ES_'+stock,
+				python_callable=post_chart_ES_func,
+				op_kwargs={'no': stock}
+			)
+			get_chart >> post_chart_ES

@@ -5,6 +5,7 @@ import requests
 from elasticsearch import Elasticsearch
 import json
 import os
+import csv
 
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
@@ -43,17 +44,20 @@ with DAG(
     description='Fugle Meta API DAG',
     tags=['meta', 'fugle'],
 ) as dag_meta:
-	stocks = ['2330','2454']
-	for stock in stocks:
-		r = requests.get('https://api.fugle.tw/realtime/v0.2/intraday/meta?symbolId='+stock+'&apiToken=706707e3df7e8e54a6932b59c85b77ca')
-		get_meta = PythonOperator(
-			task_id='get_meta_'+stock,
-			python_callable=get_meta_func,
-			op_kwargs={'r':r,'no':stock}
-		)
-		post_meta_ES = PythonOperator(
-			task_id='post_meta_ES_'+stock,
-			python_callable=post_meta_ES_func,
-			op_kwargs={'no': stock}
-		)
-		get_meta >> post_meta_ES
+	with open('id.csv', newline='') as csvfile:
+		rows = csv.reader(csvfile)
+		stocks = list(rows)[0]
+	
+		for stock in stocks:
+			r = requests.get('https://api.fugle.tw/realtime/v0.2/intraday/meta?symbolId='+stock+'&apiToken=706707e3df7e8e54a6932b59c85b77ca')
+			get_meta = PythonOperator(
+				task_id='get_meta_'+stock,
+				python_callable=get_meta_func,
+				op_kwargs={'r':r,'no':stock}
+			)
+			post_meta_ES = PythonOperator(
+				task_id='post_meta_ES_'+stock,
+				python_callable=post_meta_ES_func,
+				op_kwargs={'no': stock}
+			)
+			get_meta >> post_meta_ES
