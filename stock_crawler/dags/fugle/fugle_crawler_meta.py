@@ -15,19 +15,20 @@ from airflow.models import XCom
 local_tz = pendulum.timezone("Asia/Taipei")
 args = {
 	"owner":"Josix",
-	"retries":3,
-	"retry_delay":timedelta(seconds=10),
+	"retries":4,
+	"retry_delay":timedelta(seconds=60),
+	"execution_timeout":timedelta(minutes=20)
 }
 
 def get_meta_func(r,no,ti):
 	r = r.json()
+	today = r['data']['info']['date']
 	r = r['data']['meta']
 	pop_attributes = ["isIndex","nameZhTw","industryZhTw","canDayBuySell","canDaySellBuy","canShortMargin","canShortLend","volumePerUnit","currency","isWarrant","typeZhTw","isUnusuallyRecommended"]
 	for pop_attribute in pop_attributes:
 		r.pop(pop_attribute)
 		
-	today = date.today()
-	r.update({"date":today.strftime("%Y-%m-%d"),"stock":no})
+	r.update({"date":today,"stock":no})
 	ti.xcom_push(key='meta_'+no, value=r)
 
 def post_meta_ES_func(no,ti):
@@ -37,14 +38,14 @@ def post_meta_ES_func(no,ti):
 	es.index(index='meta', body=data)
 
 with DAG(
-    'fugle_meta',
+	'fugle_meta',
 	default_args=args,
 	start_date=datetime(2021, 5, 27, tzinfo=local_tz),
 	schedule_interval="5 0 * * 1-5",#MON to FRI 00:05 in morning
-    description='Fugle Meta API DAG',
-    tags=['meta', 'fugle'],
+	description='Fugle Meta API DAG',
+	tags=['meta', 'fugle'],
 ) as dag_meta:
-	stocks = ['2330']
+	stocks = ['1101', '1102', '1103', '1104', '1109','2330']
 	for stock in stocks:
 		r = requests.get('https://api.fugle.tw/realtime/v0.2/intraday/meta?symbolId='+stock+'&apiToken=706707e3df7e8e54a6932b59c85b77ca')
 		get_meta = PythonOperator(
