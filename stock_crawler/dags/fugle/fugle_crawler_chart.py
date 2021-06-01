@@ -19,29 +19,30 @@ args = {
 }
 
 def get_chart_func(r,no,ti):
-	local = time.localtime()
-	today = date.today()
-	current = today.strftime("%Y-%m-%dT")+time.strftime("%H:", local)+"{:02d}".format(local.tm_min-1)+":00.000+08:00"
-	#data will delay 1 min
-	r = r.json()
-	r = r['data']['chart']
-	r = r[current]
-	r.update({"date":today.strftime("%Y-%m-%d"),"time":time.strftime("%H:", local)+"{:02d}".format(local.tm_min-1),"stock":no})	
-	ti.xcom_push(key='chart_'+no, value=r)
+        r = r.json()
+        r = r['data']['chart']
+        time_list = [ t for t in r]
+        push_items = []
+        for time in time_list:
+                item = r[time]
+                item.update({"time":time,"stock":no})
+                push_items.append(item) 
+        ti.xcom_push(key='chart_'+no, value=push_items)
 
-def post_chart_ES_func(no,ti):	
-	es = Elasticsearch(hosts='127.0.0.1', port=9200)
-	data = ti.xcom_pull(key='chart_'+no)
-	data = json.dumps(data)
-	es.index(index='chart', body=data)
+def post_chart_ES_func(no,ti):
+        es = Elasticsearch(hosts='127.0.0.1', port=9200)
+        datas = ti.xcom_pull(key='chart_'+no)
+        for data in datas:
+                data = json.dumps(data) 
+                es.index(index='chart', body=data)
 
 with DAG(
-    'fugle_chart',
+	'fugle_chart',
 	default_args=args,
 	start_date=datetime(2021, 5, 27, tzinfo=local_tz),
 	schedule_interval="*/1 9-14 * * 1-5",#MON to FRI every minute from 9:00 to 14:00
-    description='Fugle Meta API DAG',
-    tags=['chart', 'fugle'],
+	description='Fugle Meta API DAG',
+	tags=['chart', 'fugle'],
 ) as dag_chart:
 	stocks=['2330']
 	for stock in stocks:
