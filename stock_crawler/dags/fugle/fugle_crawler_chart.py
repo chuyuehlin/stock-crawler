@@ -9,18 +9,19 @@ import csv
 
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
+from airflow.operators.http_operator import SimpleHttpOperator
 from airflow.utils.db import provide_session
 from airflow.models import XCom
 local_tz = pendulum.timezone("Asia/Taipei")
 args = {
 	"owner":"Josix",
-	"retries":3,
-	"retry_delay":timedelta(seconds=10),
+	"retries":2,
+	"retry_delay":timedelta(seconds=60),
 }
 
-def get_chart_func(r,no,ti):
-	r = r.json()#request from outside
-	r = r['data']['chart']#data for every minute 
+def chart_processing_func(no,ti):
+	r = ti.xcom_pull(key='return_value',task_ids='get_chart_'+no)
+	r = r['chart']#data for every minute 
 	time_list = [ t for t in r]#build list of time(string) from 9:00 to 13:30
 	push_items = []
 	for time in time_list:
@@ -40,21 +41,28 @@ with DAG(
 	'fugle_chart',
 	default_args=args,
 	start_date=datetime(2021, 5, 27, tzinfo=local_tz),
-	schedule_interval="0 17 * * 1-5",#MON to FRI 17:00
+	schedule_interval="0 14 * * 1-5",#MON to FRI 17:00
 	description='Fugle Meta API DAG',
 	tags=['chart', 'fugle'],
 ) as dag_chart:
 	stocks=['1101', '1102', '1103', '1104', '1109','2330']
 	for stock in stocks:
 		r = requests.get('https://api.fugle.tw/realtime/v0.2/intraday/chart?symbolId='+stock+'&apiToken=706707e3df7e8e54a6932b59c85b77ca')
-		get_chart = PythonOperator(
+		get_chart = SimpleHttpOperator(
 			task_id='get_chart_'+stock,
-			python_callable=get_chart_func,
-			op_kwargs={'r':r,'no':stock}
+			method='GET',
+			http_conn_id='fugle_API',
+			endpoint='realtime/v0.2/intraday/chart?symbolId='+stock+'&apiToken=706707e3df7e8e54a6932b59c85b77ca',
+			response_filter=lambda response: response.json()['data']
+		)
+		chart_processing = PythonOperator(
+			task_id='chart_processing_'+stock,
+			python_callable=chart_processing_func,
+			op_kwargs={'no':stock}
 		)
 		post_chart_ES = PythonOperator(
 			task_id='post_chart_ES_'+stock,
 			python_callable=post_chart_ES_func,
 			op_kwargs={'no': stock}
 		)
-		get_chart >> post_chart_ES
+		get_chart >> chart_processing >> post_chart_ES
