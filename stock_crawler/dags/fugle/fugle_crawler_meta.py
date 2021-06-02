@@ -10,7 +10,7 @@ import csv
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 from airflow.utils.db import provide_session
-from airflow.models import XCom
+from airflow.models import XCom, Variable
 from airflow.operators.http_operator import SimpleHttpOperator
 local_tz = pendulum.timezone("Asia/Taipei")
 args = {
@@ -31,7 +31,7 @@ def meta_processing_func(no,ti):
 	ti.xcom_push(key='meta_'+no, value=r)
 
 def post_meta_ES_func(no,ti):
-	es = Elasticsearch(hosts='127.0.0.1', port=9200)
+	es = Elasticsearch(hosts=Variable.get("ES_CONNECTION"), port=9200)
 	data = ti.xcom_pull(key='meta_'+no)
 	data = json.dumps(data)
 	es.index(index='meta', body=data)
@@ -44,13 +44,14 @@ with DAG(
 	description='Fugle Meta API DAG',
 	tags=['meta', 'fugle'],
 ) as dag_meta:
-	stocks = ['1101', '1102', '1103', '1104', '1109','2330']
+	stocks = (Variable.get("ALL_STOCK_ID", deserialize_json=True))["all"] 
 	for stock in stocks:
+		stock=str(stock)
 		get_meta = SimpleHttpOperator(
 			task_id='get_meta_'+stock,
 			method='GET',
 			http_conn_id='fugle_API',
-			endpoint='/realtime/v0.2/intraday/meta?symbolId='+stock+'&apiToken=706707e3df7e8e54a6932b59c85b77ca',
+			endpoint='/realtime/v0.2/intraday/meta?symbolId='+stock+'&apiToken='+Variable.get("FUGLE_API_TOKEN"),
 			response_filter=lambda response: response.json()['data']
 		)
 		meta_processing = PythonOperator(
