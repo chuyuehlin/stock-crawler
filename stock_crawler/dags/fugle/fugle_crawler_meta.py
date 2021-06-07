@@ -9,9 +9,9 @@ import csv
 
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
+from airflow.operators.http_operator import SimpleHttpOperator
 from airflow.utils.db import provide_session
 from airflow.models import XCom, Variable
-from airflow.operators.http_operator import SimpleHttpOperator
 local_tz = pendulum.timezone("Asia/Taipei")
 args = {
 	"owner":"Josix",
@@ -21,13 +21,13 @@ args = {
 
 def meta_processing_func(no,ti):
 	r = ti.xcom_pull(key='return_value',task_ids='get_meta_'+no)
-	today = r['info']['date']
+	info = r['info']
 	r = r['meta']
-	pop_attributes = ["isIndex","nameZhTw","industryZhTw","canDayBuySell","canDaySellBuy","canShortMargin","canShortLend","volumePerUnit","currency","isWarrant","typeZhTw","isUnusuallyRecommended"]
+	r.update(info)
+	pop_attributes = ["lastUpdatedAt","canDayBuySell","canDaySellBuy","canShortMargin","canShortLend","volumePerUnit","currency","typeZhTw","isUnusuallyRecommended"]
 	for pop_attribute in pop_attributes:
 		r.pop(pop_attribute)
 		
-	r.update({"date":today,"stock":no})
 	ti.xcom_push(key='meta_'+no, value=r)
 
 def post_meta_ES_func(no,ti):
@@ -39,8 +39,8 @@ def post_meta_ES_func(no,ti):
 with DAG(
 	'fugle_meta',
 	default_args=args,
-	start_date=datetime(2021, 5, 27, tzinfo=local_tz),
-	schedule_interval="0 8 * * 1-5",#MON to FRI 00:05 in morning
+	start_date=datetime(2021, 6, 1, tzinfo=local_tz),
+	schedule_interval="21 20 * * 1-5",#MON to FRI 00:05 in morning
 	description='Fugle Meta API DAG',
 	tags=['meta', 'fugle'],
 ) as dag_meta:
